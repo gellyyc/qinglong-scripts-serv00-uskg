@@ -29,8 +29,8 @@
 
 ## 作者
 
-你的 GitHub 用户名
+gellyyc
 
 ## 许可证
 
-MIT License
+Copyright (c) 2025 Gelly-Studio
