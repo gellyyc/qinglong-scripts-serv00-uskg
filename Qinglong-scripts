@@ -1,0 +1,204 @@
+# -*- coding: utf-8 -*-
+import requests
+import json
+import time
+import datetime
+import os
+
+# ------------------------------ 配置信息 ------------------------------
+# 企业微信相关信息 (请替换成你自己的信息)
+CORP_ID = "你的企业ID"
+APP_ID = "你的应用ID"
+APP_SECRET = "你的应用Secret"
+TO_USER = "@all"  # 指定接收消息的用户，@all表示全体成员
+
+# 账号信息
+SERV00_COOKIES = [  # 替换成你 serv00.com 的 Cookie 列表
+    os.environ.get("SERV00_COOKIE_1"),
+    os.environ.get("SERV00_COOKIE_2"),
+    os.environ.get("SERV00_COOKIE_3"),
+    os.environ.get("SERV00_COOKIE_4"),
+    os.environ.get("SERV00_COOKIE_5"),
+]
+
+USKG_COOKIES = [  # 替换成你 us.kg 的 Cookie 列表
+    os.environ.get("USKG_COOKIE_1"),
+    os.environ.get("USKG_COOKIE_2"),
+    os.environ.get("USKG_COOKIE_3"),
+    os.environ.get("USKG_COOKIE_4"),
+    os.environ.get("USKG_COOKIE_5"),
+    os.environ.get("USKG_COOKIE_6"),
+]
+
+# ------------------------------ 函数定义 ------------------------------
+
+def get_access_token(corp_id, app_secret):
+    """获取企业微信Access Token"""
+    url = f"https://qyapi.weixin.qq.com/cgi-bin/gettoken?corpid={corp_id}&corpsecret={app_secret}"
+    try:
+        response = requests.get(url)
+        response.raise_for_status()  # 检查请求是否成功
+        data = response.json()
+        if data["errcode"] == 0:
+            return data["access_token"]
+        else:
+            print(f"获取AccessToken失败: {data['errmsg']}")
+            return None
+    except requests.exceptions.RequestException as e:
+        print(f"获取AccessToken请求出错: {e}")
+        return None
+
+def send_wechat_message(corp_id, app_id, app_secret, to_user, message):
+    """发送企业微信消息"""
+    access_token = get_access_token(corp_id, app_secret)
+    if not access_token:
+        print("无法发送企业微信消息，获取AccessToken失败")
+        return
+
+    url = f"https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token={access_token}"
+    payload = {
+        "touser": to_user,
+        "msgtype": "text",
+        "agentid": app_id,
+        "text": {
+            "content": message
+        },
+        "safe": 0
+    }
+    try:
+        response = requests.post(url, data=json.dumps(payload).encode('utf-8'))
+        response.raise_for_status()
+        data = response.json()
+        if data["errcode"] != 0:
+            print(f"发送消息失败: {data['errmsg']}")
+    except requests.exceptions.RequestException as e:
+        print(f"发送消息请求出错: {e}")
+
+# ------------------------------ serv00.com 签到 ------------------------------
+
+def sign_in_serv00(cookie):
+    """serv00.com 签到 (单个账号)"""
+    try:
+        # 替换成你分析到的真实信息
+        SERV00_API = "你的 serv00.com 签到 API 地址"
+        SERV00_HEADERS = {
+            "Cookie": cookie,  # 使用传入的 Cookie
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"  # 模拟浏览器
+        }
+        SERV00_DATA = {}  # POST 请求的参数 (如果需要)
+
+        # 发送请求
+        response = requests.get(SERV00_API, headers=SERV00_HEADERS) # GET 方法
+        # response = requests.post(SERV00_API, headers=SERV00_HEADERS, data=SERV00_DATA) # POST 方法
+
+        response.raise_for_status()
+        result = response.json()  # 尝试解析 JSON
+
+        if result["status"] == "success":  # 替换成你实际返回的成功状态
+            message = f"✅ serv00.com 签到成功！\n{result['message']}"
+            status = "成功"
+        else:
+            message = f"❌ serv00.com 签到失败！\n{result['message']}"
+            status = "失败"
+
+    except requests.exceptions.RequestException as e:
+        message = f"❌ serv00.com 签到请求出错: {e}"
+        status = "出错"
+    except json.JSONDecodeError:
+        message = f"❌ serv00.com 签到返回非JSON数据: {response.text}"
+        status = "出错"
+    except Exception as e:
+        message = f"❌ serv00.com 签到发生未知错误: {e}"
+        status = "出错"
+
+    return status, message
+
+def process_serv00_accounts():
+    """循环处理 serv00.com 账号"""
+    print("开始 serv00.com 账号签到...")
+    for i, cookie in enumerate(SERV00_COOKIES):
+        if cookie:  # 确保 Cookie 不为空
+            print(f"--- 开始处理 serv00.com 账号 {i+1} ---")
+            status, message = sign_in_serv00(cookie)
+
+            # 美观的日志输出
+            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            if status == "成功":
+                print(f"\033[32m{timestamp} - serv00.com 账号 {i+1} 签到: {status}\033[0m") # 绿色
+            elif status == "失败":
+                print(f"\033[31m{timestamp} - serv00.com 账号 {i+1} 签到: {status}\033[0m") # 红色
+            else:
+                print(f"\033[33m{timestamp} - serv00.com 账号 {i+1} 签到: {status}\033[0m") # 黄色
+
+            # 发送企业微信通知 (可以根据需要修改通知内容)
+            send_wechat_message(CORP_ID, APP_ID, APP_SECRET, TO_USER, f"serv00.com 账号 {i+1} 签到: {message}")
+        else:
+            print(f"--- serv00.com 账号 {i+1} Cookie 为空，跳过 ---")
+
+# ------------------------------ us.kg 签到 ------------------------------
+
+def sign_in_uskg(cookie):
+    """us.kg 签到 (单个账号)"""
+    try:
+        # 替换成你分析到的真实信息
+        USKG_API = "你的 us.kg 签到 API 地址"
+        USKG_HEADERS = {
+            "Cookie": cookie,  # 使用传入的 Cookie
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"  # 模拟浏览器
+        }
+        USKG_DATA = {}  # POST 请求的参数 (如果需要)
+
+        # 发送请求
+        response = requests.get(USKG_API, headers=USKG_HEADERS) # GET 方法
+        # response = requests.post(USKG_API, headers=USKG_HEADERS, data=USKG_DATA) # POST 方法
+
+        response.raise_for_status()
+        result = response.json()  # 尝试解析 JSON
+
+        if result["status"] == "success":  # 替换成你实际返回的成功状态
+            message = f"✅ us.kg 签到成功！\n{result['message']}"
+            status = "成功"
+        else:
+            message = f"❌ us.kg 签到失败！\n{result['message']}"
+            status = "失败"
+
+    except requests.exceptions.RequestException as e:
+        message = f"❌ us.kg 签到请求出错: {e}"
+        status = "出错"
+    except json.JSONDecodeError:
+        message = f"❌ us.kg 签到返回非JSON数据: {response.text}"
+        status = "出错"
+    except Exception as e:
+        message = f"❌ us.kg 签到发生未知错误: {e}"
+        status = "出错"
+
+    return status, message
+
+def process_uskg_accounts():
+    """循环处理 us.kg 账号"""
+    print("开始 us.kg 账号签到...")
+    for i, cookie in enumerate(USKG_COOKIES):
+        if cookie:  # 确保 Cookie 不为空
+            print(f"--- 开始处理 us.kg 账号 {i+1} ---")
+            status, message = sign_in_uskg(cookie)
+
+            # 美观的日志输出
+            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            if status == "成功":
+                print(f"\033[32m{timestamp} - us.kg 账号 {i+1} 签到: {status}\033[0m") # 绿色
+            elif status == "失败":
+                print(f"\033[31m{timestamp} - us.kg 账号 {i+1} 签到: {status}\033[0m") # 红色
+            else:
+                print(f"\033[33m{timestamp} - us.kg 账号 {i+1} 签到: {status}\033[0m") # 黄色
+
+            # 发送企业微信通知 (可以根据需要修改通知内容)
+            send_wechat_message(CORP_ID, APP_ID, APP_SECRET, TO_USER, f"us.kg 账号 {i+1} 签到: {message}")
+        else:
+            print(f"--- us.kg 账号 {i+1} Cookie 为空，跳过 ---")
+
+# ------------------------------ 主程序 ------------------------------
+if __name__ == "__main__":
+    print("程序开始运行...")
+    process_serv00_accounts()
+    process_uskg_accounts()
+    print("程序运行结束...")
